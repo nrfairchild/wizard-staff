@@ -96,7 +96,7 @@ $("connect").onclick = async () => {
 };
 
 document.querySelectorAll("#modes button").forEach(b => b.onclick = () => { mode = +b.dataset.m; markActive(); send(); });
-$("color").oninput = () => { mode = 4; markActive(); send(); };
+$("color").oninput = () => { if (mode !== 3) mode = 4; markActive(); send(); };
 $("bright").oninput = () => { $("bv").textContent = $("bright").value + "%"; send(); };
 $("speed").oninput = () => { $("sv").textContent = $("speed").value; send(); };
 markActive();

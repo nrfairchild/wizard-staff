@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wizard Staff Control</title>
+<style>
+:root{--bg:#f4f1ea;--card:#fff;--text:#1d1a24;--muted:#6b6577;--accent:#6a3fd1;--accent-text:#fff;--line:#ddd6e8;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15121c;--card:#211c2c;--text:#f1edf8;--muted:#a79fb8;--accent:#9a78f0;--accent-text:#15121c;--line:#3a3250}}
+:root[data-theme="dark"]{--bg:#15121c;--card:#211c2c;--text:#f1edf8;--muted:#a79fb8;--accent:#9a78f0;--accent-text:#15121c;--line:#3a3250}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;padding:16px;max-width:480px;margin:0 auto}
+h1{font-size:1.4rem;margin:8px 0 4px}
+p.sub{color:var(--muted);margin:0 0 16px;font-size:.9rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+button{font:inherit;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-text);border:none;width:100%;font-weight:600}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid button.active{outline:2px solid var(--accent);font-weight:600}
+label{display:flex;justify-content:space-between;margin:10px 0 4px;font-size:.9rem;color:var(--muted)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+input[type=color]{width:100%;height:44px;border:1px solid var(--line);border-radius:10px;background:var(--card);padding:2px}
+#status{font-size:.85rem;color:var(--muted);margin-top:8px;text-align:center}
+</style>
+</head>
+<body>
+<h1>🧙 Wizard Staff</h1>
+<p class="sub">Control the jewel over Bluetooth.</p>
+
+<div class="card">
+  <button class="primary" id="connect">Connect to staff</button>
+  <div id="status">Not connected</div>
+</div>
+
+<div class="card">
+  <div class="grid" id="modes">
+    <button data-m="1">Flash colors</button>
+    <button data-m="2">Rainbow fade</button>
+    <button data-m="3">White pulse</button>
+    <button data-m="4">Solid color</button>
+    <button data-m="0" style="grid-column:span 2">Off</button>
+  </div>
+</div>
+
+<div class="card">
+  <label>Color (solid mode)</label>
+  <input type="color" id="color" value="#0000ff">
+  <label>Brightness <span id="bv">100%</span></label>
+  <input type="range" id="bright" min="5" max="100" value="100">
+  <label>Speed <span id="sv">5</span></label>
+  <input type="range" id="speed" min="1" max="10" value="5">
+</div>
+
+<p class="sub" style="text-align:center">Works in Chrome on Android and desktop. iPhones need a Web Bluetooth browser such as Bluefy.</p>
+
+<script>
+const SERVICE = "6e5a0001-7a1c-4b8e-9d3f-5a1c0de57aff";
+const CHAR = "6e5a0002-7a1c-4b8e-9d3f-5a1c0de57aff";
+let ch = null, mode = 4, busy = false;
+const $ = id => document.getElementById(id);
+
+function setStatus(t){ $("status").textContent = t; }
+
+function packet(){
+  const c = $("color").value;
+  const r = parseInt(c.slice(1,3),16), g = parseInt(c.slice(3,5),16), b = parseInt(c.slice(5,7),16);
+  const br = Math.round($("bright").value / 100 * 255);
+  return new Uint8Array([mode, r, g, b, br, parseInt($("speed").value)]);
+}
+
+async function send(){
+  if(!ch || busy) return;
+  busy = true;
+  try { await ch.writeValue(packet()); }
+  catch(e){ setStatus("Send failed: " + e.message); }
+  busy = false;
+}
+
+function markActive(){
+  document.querySelectorAll("#modes button").forEach(b => b.classList.toggle("active", +b.dataset.m === mode));
+}
+
+$("connect").onclick = async () => {
+  if(!navigator.bluetooth){ setStatus("This browser doesn’t support Web Bluetooth."); return; }
+  try {
+    setStatus("Searching…");
+    const dev = await navigator.bluetooth.requestDevice({ filters:[{services:[SERVICE]}] });
+    dev.addEventListener("gattserverdisconnected", () => { ch = null; setStatus("Disconnected"); $("connect").textContent = "Connect to staff"; });
+    const srv = await dev.gatt.connect();
+    const svc = await srv.getPrimaryService(SERVICE);
+    ch = await svc.getCharacteristic(CHAR);
+    setStatus("Connected to " + (dev.name || "staff"));
+    $("connect").textContent = "Connected ✓";
+  } catch(e){ setStatus("Couldn’t connect: " + e.message); }
+};
+
+document.querySelectorAll("#modes button").forEach(b => b.onclick = () => { mode = +b.dataset.m; markActive(); send(); });
+$("color").oninput = () => { mode = 4; markActive(); send(); };
+$("bright").oninput = () => { $("bv").textContent = $("bright").value + "%"; send(); };
+$("speed").oninput = () => { $("sv").textContent = $("speed").value; send(); };
+markActive();
+</script>
+</body>
+</html>

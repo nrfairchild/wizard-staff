@@ -46,6 +46,12 @@ input[type=color]{width:100%;height:44px;border:1px solid var(--line);border-rad
 <div class="card">
   <label>Color (solid/pulse mode)</label>
   <input type="color" id="color" value="#0000ff">
+  <label>Red <span id="rv">0</span></label>
+  <input type="range" id="r" min="0" max="255" value="0">
+  <label>Green <span id="gv">0</span></label>
+  <input type="range" id="g" min="0" max="255" value="0">
+  <label>Blue <span id="bv2">255</span></label>
+  <input type="range" id="b" min="0" max="255" value="255">
   <label>Brightness <span id="bv">100%</span></label>
   <input type="range" id="bright" min="5" max="100" value="100">
   <label>Speed <span id="sv">5</span></label>
@@ -96,7 +102,25 @@ $("connect").onclick = async () => {
 };
 
 document.querySelectorAll("#modes button").forEach(b => b.onclick = () => { mode = +b.dataset.m; markActive(); send(); });
-$("color").oninput = () => { if (mode !== 3) mode = 4; markActive(); send(); };
+  function syncSliders(){
+  const c = $("color").value;
+  [["r",1,"rv"],["g",3,"gv"],["b",5,"bv2"]].forEach(([id,i,lbl]) => {
+    const v = parseInt(c.slice(i,i+2),16);
+    $(id).value = v; $(lbl).textContent = v;
+  });
+}
+function fromSliders(){
+  const h = id => (+$(id).value).toString(16).padStart(2,"0");
+  $("color").value = "#" + h("r") + h("g") + h("b");
+  $("rv").textContent = $("r").value;
+  $("gv").textContent = $("g").value;
+  $("bv2").textContent = $("b").value;
+}
+$("color").oninput = () => { syncSliders(); if (mode !== 3) mode = 4; markActive(); send(); };
+["r","g","b"].forEach(id => {
+  $(id).oninput = () => { fromSliders(); if (mode !== 3) mode = 4; markActive(); send(); };
+  $(id).onchange = send;
+});
 $("bright").oninput = () => { $("bv").textContent = $("bright").value + "%"; send(); };
 $("speed").oninput = () => { $("sv").textContent = $("speed").value; send(); };
 markActive();
